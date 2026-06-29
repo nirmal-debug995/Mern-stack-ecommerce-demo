@@ -1,0 +1,43 @@
+name: Test Branch Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Azure VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: azureuser
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd ~/Mern-stack-ecommerce-demo/MERN-Stack-Ecommerce-App-master
+
+            echo "Pulling latest code..."
+            git pull origin test
+
+            echo "Installing backend dependencies..."
+            cd backend
+            npm install
+
+            echo "Restarting backend..."
+            pm2 restart backend || pm2 start index.js --name backend
+
+            cd ..
+
+            echo "Installing frontend dependencies..."
+            npm install
+
+            echo "Building frontend..."
+            npm run build
+
+            echo "Deployment completed successfully"
