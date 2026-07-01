@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fusion-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fusion-frontend
+  template:
+    metadata:
+      labels:
+        app: fusion-frontend
+    spec:
+      containers:
+      - name: fusion-frontend
+        image: mernappacr.azurecr.io/fusion-frontend:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80

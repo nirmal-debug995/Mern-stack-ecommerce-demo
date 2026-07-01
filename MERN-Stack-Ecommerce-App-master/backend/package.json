@@ -5,7 +5,7 @@
   "description": "A backend server for Fusion Electronics - a MERN stack e-commerce website",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js",
+    "start": "node index.js",
     "build": "node index.js",
     "test": "jest",
     "test:watch": "jest --watch",

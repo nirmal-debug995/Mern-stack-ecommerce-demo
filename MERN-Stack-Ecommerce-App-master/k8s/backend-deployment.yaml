@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fusion-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fusion-backend
+  template:
+    metadata:
+      labels:
+        app: fusion-backend
+    spec:
+      containers:
+      - name: fusion-backend
+        image: mernappacr.azurecr.io/fusion-backend:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+        envFrom:
+        - secretRef:
+            name: backend-secret

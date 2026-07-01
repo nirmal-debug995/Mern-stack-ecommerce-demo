@@ -1,14 +1,13 @@
-FROM node:18-alpine AS deps
+FROM node:20-alpine
+
 WORKDIR /app
 
-# copy only backend package files
-COPY package.json package-lock.json ./
+COPY package*.json ./
 
-# install backend dependencies
 RUN npm install
 
-# copy backend code
 COPY . .
 
-EXPOSE 8080
-CMD ["npm", "start"]
+EXPOSE 5000
+
+CMD ["npm","start"]
