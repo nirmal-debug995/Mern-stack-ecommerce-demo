@@ -2,102 +2,94 @@ pipeline {
     agent any
 
     environment {
-        ACCOUNT_ID       = "489364174421"
-        AWS_REGION       = "ap-south-1"
+        ACR_NAME = "mernappacr"
+        ACR_LOGIN_SERVER = "mernappacr.azurecr.io"
 
-        FRONTEND_REPO    = "mern-frontend"
-        BACKEND_REPO     = "mern-backend"
+        FRONTEND_IMAGE = "fusion-frontend"
+        BACKEND_IMAGE = "fusion-backend"
     }
 
     stages {
 
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/azuredataengineer555-debug/mern-ecommerce-practice.git'
-            }
-        }
-
-        stage('Build Frontend App') {
-            agent { label 'deploy' }
+        stage('Build Frontend') {
             steps {
                 dir('MERN-Stack-Ecommerce-App-master') {
                     sh '''
-                        echo "=== BUILDING FRONTEND ==="
-                        npm install
-                        CI=false npm run build
+                    npm install
+                    CI=false npm run build
                     '''
                 }
             }
         }
 
-        stage('Build Backend App') {
-            agent { label 'deploy' }
+        stage('Build Backend') {
             steps {
                 dir('MERN-Stack-Ecommerce-App-master/backend') {
                     sh '''
-                        echo "=== INSTALLING BACKEND DEPENDENCIES ==="
-                        npm install
+                    npm install
+                    '''
+                }
+            }
+        }
+
+        stage('Azure Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'azure-sp',
+                    usernameVariable: 'AZURE_CLIENT_ID',
+                    passwordVariable: 'AZURE_CLIENT_SECRET'
+                )]) {
+
+                    sh '''
+                    az login --service-principal \
+                      -u $AZURE_CLIENT_ID \
+                      -p $AZURE_CLIENT_SECRET \
+                      --tenant 99f0e748-181d-4fc2-88da-47a1569be0e2
+
+                    az account set --subscription be01b6cb-fb41-465f-b65a-155a8942e8ba
+
+                    az acr login --name ${ACR_NAME}
                     '''
                 }
             }
         }
 
         stage('Build Docker Images') {
-            agent { label 'deploy' }
             steps {
-                sh '''
-                    echo "=== BUILDING FRONTEND IMAGE ==="
-                    docker build -t ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_REPO}:latest \
-                    -f MERN-Stack-Ecommerce-App-master/Dockerfile MERN-Stack-Ecommerce-App-master
+                sh """
+                docker build -t ${ACR_LOGIN_SERVER}/${FRONTEND_IMAGE}:${BUILD_NUMBER} \
+                -f MERN-Stack-Ecommerce-App-master/Dockerfile \
+                MERN-Stack-Ecommerce-App-master
 
-                    echo "=== BUILDING BACKEND IMAGE ==="
-                    docker build -t ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${BACKEND_REPO}:latest \
-                    -f MERN-Stack-Ecommerce-App-master/backend/Dockerfile MERN-Stack-Ecommerce-App-master/backend
-                '''
+                docker build -t ${ACR_LOGIN_SERVER}/${BACKEND_IMAGE}:${BUILD_NUMBER} \
+                -f MERN-Stack-Ecommerce-App-master/backend/Dockerfile \
+                MERN-Stack-Ecommerce-App-master/backend
+                """
             }
         }
 
-        stage('Login to AWS ECR') {
-            agent { label 'deploy' }
+        stage('Push Images') {
             steps {
-                sh '''
-                    aws ecr get-login-password --region ${AWS_REGION} \
-                    | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                '''
+                sh """
+                docker push ${ACR_LOGIN_SERVER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}
+                docker push ${ACR_LOGIN_SERVER}/${BACKEND_IMAGE}:${BUILD_NUMBER}
+                """
             }
         }
 
-        stage('Push Images to ECR') {
-            agent { label 'deploy' }
+        stage('Deploy to AKS') {
             steps {
-                sh '''
-                    docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_REPO}:latest
-                    docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${BACKEND_REPO}:latest
-                '''
+                sh """
+                kubectl set image deployment/fusion-frontend \
+                fusion-frontend=${ACR_LOGIN_SERVER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}
+
+                kubectl set image deployment/fusion-backend \
+                fusion-backend=${ACR_LOGIN_SERVER}/${BACKEND_IMAGE}:${BUILD_NUMBER}
+
+                kubectl rollout status deployment/fusion-frontend
+                kubectl rollout status deployment/fusion-backend
+                """
             }
-        }
-
-        stage('Deploy Containers') {
-            agent { label 'deploy' }
-            steps {
-                sh '''
-                    docker rm -f frontend || true
-                    docker rm -f backend || true
-
-                    docker run -d --name frontend -p 80:80 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_REPO}:latest
-                    docker run -d --name backend -p 5000:5000 ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${BACKEND_REPO}:latest
-                '''
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "🎉 Deployment Successful!"
-        }
-        failure {
-            echo "❌ Deployment Failed — Check logs"
         }
     }
 }
