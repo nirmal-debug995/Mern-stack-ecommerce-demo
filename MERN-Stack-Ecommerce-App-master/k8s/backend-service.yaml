@@ -7,5 +7,5 @@ spec:
     app: fusion-backend
   ports:
     - port: 5000
-      targetPort: 5000
+      targetPort: 8000
   type: ClusterIP

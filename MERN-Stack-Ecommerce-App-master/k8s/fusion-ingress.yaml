@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fusion-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+spec:
+  ingressClassName: nginx
+
+  tls:
+  - hosts:
+      - 20-235-128-106.sslip.io
+    secretName: fusion-tls
+
+  rules:
+  - host: 20-235-128-106.sslip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: fusion-frontend-service
+            port:
+              number: 80
+
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: fusion-backend-service
+            port:
+              number: 5000
